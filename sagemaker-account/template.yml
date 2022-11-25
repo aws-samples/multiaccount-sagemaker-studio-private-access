@@ -1,0 +1,332 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Sagemaker Account Deployment
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: 10.100.0.0/16
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}($|\/(8|16|24|32))$
+  PrivateSubnetACidr:
+    Type: String
+    Default: 10.100.10.0/24
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}($|\/(8|16|24|32))$
+  PrivateSubnetBCidr:
+    Type: String
+    Default: 10.100.11.0/24
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}($|\/(8|16|24|32))$ 
+  AttachSubnetACidr:
+    Type: String
+    Default: 10.100.20.0/24
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}($|\/(8|16|24|32))$
+  AttachSubnetBCidr:
+    Type: String
+    Default: 10.100.21.0/24
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}($|\/(8|16|24|32))$
+  SagemakerDomainName:
+    Type: String
+    Default: ESPDataScience
+  UserId:
+    Type: String
+    Default: sagemaker-user
+  SagemakerStudioVpce:
+    Type: String
+  SagemakerApiVpce:
+    Type: String
+  LambdaPresignedUrlRoleArn:
+    Type: String
+  TGWId:
+    Description: Core Network TGWId
+    Type: String 
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  
+  #-####### VPCS and SUBNETS ########
+  VPCStudioDomain:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [StudioDomain, Ref: "AWS::StackName"]]
+
+  PrivateSubnetAStudioDomain:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCStudioDomain
+      CidrBlock: !Ref PrivateSubnetACidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'a']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [StudioDomain, Ref: "AWS::StackName", Priv-A Subnet]]
+
+  PrivateSubnetBStudioDomain:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCStudioDomain
+      CidrBlock: !Ref PrivateSubnetBCidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'b']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [StudioDomain, Ref: "AWS::StackName", Priv-B Subnet]]
+
+  PrivateSubnetRouteTableStudioDomain:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPCStudioDomain
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [StudioDomain, Ref: "AWS::StackName", Private Route Table]]
+
+  PrivateASubnetRouteTableAssociationStudioDomain:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableStudioDomain
+      SubnetId:
+        Ref: PrivateSubnetAStudioDomain
+
+  PrivateBSubnetRouteTableAssociationStudioDomain:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableStudioDomain
+      SubnetId:
+        Ref: PrivateSubnetBStudioDomain
+
+  DefaultRoutePrivate:
+    DependsOn:
+    - TGWAttachment
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableStudioDomain
+      DestinationCidrBlock: '0.0.0.0/0'
+      TransitGatewayId:
+        Ref: TGWId
+
+  AttachSubnetAStudioDomain:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCStudioDomain
+      CidrBlock: !Ref AttachSubnetACidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'a']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [StudioDomain, Ref: "AWS::StackName", Attach-A Subnet]]
+
+  AttachSubnetBStudioDomain:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCStudioDomain
+      CidrBlock: !Ref AttachSubnetBCidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'b']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [StudioDomain, Ref: "AWS::StackName", Attach-B Subnet]]
+
+  AttachSubnetRouteTableStudioDomain:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPCStudioDomain
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [StudioDomain, Ref: "AWS::StackName", Attach Route Table]]
+
+  AttachASubnetRouteTableAssociationStudioDomain:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: AttachSubnetRouteTableStudioDomain
+      SubnetId:
+        Ref: AttachSubnetAStudioDomain
+
+  AttachBSubnetRouteTableAssociationStudioDomain:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: AttachSubnetRouteTableStudioDomain
+      SubnetId:
+        Ref: AttachSubnetBStudioDomain
+
+#################### Transit gateway attachment #############
+
+  TGWAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+        - !Ref AttachSubnetAStudioDomain
+        - !Ref AttachSubnetBStudioDomain
+      Tags:
+        - Key: Name
+          Value: !Sub TGW-Attachment
+      TransitGatewayId: !Ref TGWId
+      VpcId: !Ref VPCStudioDomain
+
+#-####### SG SageMaker ########
+
+  SecurityGroupSageMakerStudio:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPCStudioDomain
+      Tags:
+      - Key: Name
+        Value: SageMakerStudio 
+      GroupDescription: !Sub Allow All outbout and inbound
+
+  OutboundRuleSecurityGroupSageMakerStudio:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow all outbound traffic for Sagemaker Domain
+      IpProtocol: "-1"
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: 0.0.0.0/0
+      GroupId: !Ref SecurityGroupSageMakerStudio
+
+  InboundRuleSecurityGroupSageMakerStudio:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow Inbound Traffic from itself
+      IpProtocol: "-1"
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref SecurityGroupSageMakerStudio 
+      GroupId: !Ref SecurityGroupSageMakerStudio
+
+#-####### IAM Role SageMaker ########
+
+  SageMakerExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: SageMakerExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+      - PolicyName: SageMakerExecutionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 's3:GetObject'
+                - 's3:PutObject'
+                - 's3:DeleteObject'
+                - 's3:ListBucket'
+              Resource: 'arn:aws:s3:::*'
+      Path: /service-role/
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+
+#-####### Sagemaker Studio and user ########
+
+  SageMakerStudioDomain:
+    Type: AWS::SageMaker::Domain
+    Properties:
+      AppNetworkAccessType: VpcOnly
+      AuthMode: IAM
+      DomainName: !Ref SagemakerDomainName
+      SubnetIds:
+        - !Ref PrivateSubnetAStudioDomain
+        - !Ref PrivateSubnetBStudioDomain
+      DefaultUserSettings:
+          ExecutionRole: !GetAtt SageMakerExecutionRole.Arn
+          SecurityGroups:
+            - !Ref SecurityGroupSageMakerStudio
+      VpcId: !Ref VPCStudioDomain
+
+  SageMakerStudioUserProfile:
+    Type: AWS::SageMaker::UserProfile
+    Properties: 
+      DomainId: !GetAtt SageMakerStudioDomain.DomainId
+      UserProfileName: !Ref UserId
+
+  JupyterApp:
+    Type: AWS::SageMaker::App
+    DependsOn: SageMakerStudioUserProfile
+    Properties: 
+      AppName: default
+      AppType: JupyterServer
+      DomainId: !GetAtt SageMakerStudioDomain.DomainId
+      UserProfileName: !Ref UserId        
+
+######## Cross Account Role ########
+
+  CrossAccountRole: 
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: SagemakerStudioAccessRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Ref LambdaPresignedUrlRoleArn
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: SagemakerAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sagemaker:CreatePresignedDomainUrl
+                  - sagemaker:DescribeUserProfile
+                  - sagemaker:ListDomains
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    'aws:sourceVpce': 
+                      - !Ref SagemakerApiVpce
+                      - !Ref SagemakerStudioVpce
+
+Outputs:
+
+  VPCStudioDomain:
+    Value: !Ref VPCStudioDomain
+
+  PrivateSubnetAStudioDomain:
+    Value: !Ref PrivateSubnetAStudioDomain
+
+  PrivateSubnetBStudioDomain:
+    Value: !Ref PrivateSubnetBStudioDomain
+  
+  SageMakerStudioDomainId:
+    Description: "SageMaker Studio domain created"
+    Value: !GetAtt SageMakerStudioDomain.DomainId
+  
+  SecurityGroupSageMakerStudio:
+    Value: !Ref SecurityGroupSageMakerStudio

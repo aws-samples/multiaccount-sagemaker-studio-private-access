@@ -1,0 +1,284 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  SM_STUDIO Hybrid DNS Demo -  ON PREMISES
+Parameters:
+  LatestAmiId:
+    Description: AMI for EC2 instances (default = AmaLinux Latest)
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  LatestWinAmiId:
+    Description: WIN AMI for EC2 instances (default = AmaLinux Latest)
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base'
+  EC2KeyPair:
+    Description: EC2 Key pair
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: 'ec2-kp'
+  PublicIp:
+    Description: Public Ip to connect to bastion
+    Type: String
+    Default: 1.1.1.1/32
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 192.168.10.0/24
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: STUDIO-onprem
+  SubnetPRIVATEA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 192.168.10.0/26
+      Tags:
+        - Key: Name
+          Value: sn-onprem-A
+  RouteTablePrivate: 
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: STUDIO-ONPREM-RT
+  SubnetPRIVATEB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: 192.168.10.64/26
+      Tags:
+        - Key: Name
+          Value: sn-onprem-B
+
+  RouteTableAssociationPrivateA:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetPRIVATEA
+      RouteTableId: !Ref RouteTablePrivate
+
+  RouteTableAssociationPrivateB:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetPRIVATEB
+      RouteTableId: !Ref RouteTablePrivate
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTablePrivate
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  SubnetPUBLICA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 192.168.10.128/26
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: sn-onprem-public-A
+  RouteTablePublic: 
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: STUDIO-ONPREM-PUBLIC-RT
+  SubnetPUBLICB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: 192.168.10.192/26
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: sn-onprem-public-B
+  RouteTableAssociationPublicA:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetPUBLICA
+      RouteTableId: !Ref RouteTablePublic
+  RouteTableAssociationPublicB:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetPUBLICB
+      RouteTableId: !Ref RouteTablePublic
+
+######## NAT Gateways/ IGW Gateway ########
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  
+  GatewayToInternet:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref SubnetPUBLICA       
+
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayToInternet
+    Properties:
+      Domain: vpc 
+
+  ## PUBLIC ROUTING
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+#-####### SG EC2 Bastion (Public) ########
+
+  SecurityGroupBastion:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: BastionConnection
+      GroupDescription: !Sub Allow All outbound and inbound from ${VPC}  
+
+  InboundRuleSecurityGroupBastion22:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow ingress in 22 from publi ip to bastion
+      IpProtocol: "tcp"
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Ref PublicIp
+      GroupId: !Ref SecurityGroupBastion      
+
+  InboundRuleSecurityGroupBastion3389:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow ingress in 3389 from publi ip to bastion
+      IpProtocol: "tcp"
+      FromPort: 3389
+      ToPort: 3389
+      CidrIp: !Ref PublicIp
+      GroupId: !Ref SecurityGroupBastion   
+
+  OutboundRuleSecurityGroupBastion:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow all egress from security group
+      IpProtocol: "-1"
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: 0.0.0.0/0
+      GroupId: !Ref SecurityGroupBastion
+
+#-####### SG EC2 Windows (Private) ########
+
+  SecurityGroupWindows:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: RDPConnection
+      GroupDescription: !Sub Allow All outbout and inbound from ${VPC}  
+
+  InboundRuleSecurityGroupWindows3389:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow rdp inbound from bastion to windows app
+      IpProtocol: "tcp"
+      FromPort: 3389
+      ToPort: 3389
+      SourceSecurityGroupId: !Ref SecurityGroupBastion
+      GroupId: !Ref SecurityGroupWindows      
+
+  OutboundRuleSecurityGroupWindows:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow all egress for windows security group
+      IpProtocol: "-1"
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: 0.0.0.0/0
+      GroupId: !Ref SecurityGroupWindows
+
+  Ec2InstanceBastion:
+      Type: AWS::EC2::Instance
+      Properties:
+        KeyName: !Ref EC2KeyPair
+        ImageId: !Ref LatestAmiId
+        BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeType: gp2
+            DeleteOnTermination: true
+            VolumeSize: 8
+        InstanceType: t3a.nano
+        SubnetId: !Ref SubnetPUBLICA
+        Tags:
+        - Key: Name
+          Value: BASTION
+        SecurityGroupIds:
+        - !Ref SecurityGroupBastion
+
+  Ec2InstanceWindows:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: !Ref EC2KeyPair
+      ImageId: !Ref LatestWinAmiId
+      InstanceType: t3a.medium
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeType: gp3
+            DeleteOnTermination: true
+            VolumeSize: 30
+      SubnetId: !Ref SubnetPRIVATEA
+      Tags:
+      - Key: Name
+        Value: Windows   
+      SecurityGroupIds:
+      - !Ref SecurityGroupWindows
+      UserData: 
+        Fn::Base64: !Sub |
+            <powershell>
+              $workdir = "C:\"
+              $source = "https://download.mozilla.org/?product=firefox-latest&os=win64&lang=en-US"
+              $destination = "$workdir\firefox.exe"
+              Invoke-WebRequest $source -OutFile $destination
+              
+              Start-Process -FilePath "$workdir\firefox.exe" -ArgumentList "/S"
+
+              Start-Sleep -s 35
+
+              rm -Force $workdir/firefox*
+            </powershell>
+            <runAsLocalSystem>true</runAsLocalSystem> 
+
+Outputs:
+  SageMakerWindowsPassword:
+    Description: "Default password to loging to the EC2 Windows instances"
+    Value: !Sub ${VPC}
+  TunnelCommand:
+    Description: "Command to initiate the SSH tunnnel in order to access the Windows EC2 on the private subnet over RDP"
+    Value: !Join
+            - ''
+            - - 'ssh -i '
+              - !Ref EC2KeyPair
+              - '.pem '
+              - '-A -N -L localhost:3389:'
+              - !GetAtt Ec2InstanceWindows.PrivateIp
+              - ':3389 ec2-user@'
+              - !GetAtt Ec2InstanceBastion.PublicIp
