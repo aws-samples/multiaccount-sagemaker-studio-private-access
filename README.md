@@ -18,7 +18,9 @@ It shows how to create an accessing solution for Sagemaekr Studio Domains in a m
 
 Set up your region
 
-'''export AWS_DEFAULT_REGION=<your-region>'''
+```
+export AWS_DEFAULT_REGION=<your-region>
+```
 
 ### Deploy networking resources
 
