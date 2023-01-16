@@ -210,6 +210,11 @@ Resources:
     Properties:
       GroupDescription: Allow DNS queries from anywhere
       VpcId: !Ref VPCCentral
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
           Value: !Sub sg-dns-out-${AWS::StackName}
@@ -219,6 +224,11 @@ Resources:
     Properties:
       GroupDescription: Allow DNS queries from anywhere
       VpcId: !Ref VPCCentral
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
       SecurityGroupIngress:
       - IpProtocol: udp
         FromPort: 53
@@ -280,6 +290,11 @@ Resources:
       GroupName: !Join ["-", [Central, Ref: "AWS::StackName", "vpc-sec-group"]]
       VpcId:
         Ref: VPCCentral
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: "1"
