@@ -17,7 +17,6 @@ Parameters:
   PublicIp:
     Description: Public Ip to connect to bastion
     Type: String
-    Default: 1.1.1.1/32
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -268,8 +267,8 @@ Resources:
             <runAsLocalSystem>true</runAsLocalSystem> 
 
 Outputs:
-  SageMakerWindowsPassword:
-    Description: "Default password to loging to the EC2 Windows instances"
+  OnPremiseVpcId:
+    Description: "On premise VPC Id"
     Value: !Sub ${VPC}
   TunnelCommand:
     Description: "Command to initiate the SSH tunnnel in order to access the Windows EC2 on the private subnet over RDP"
