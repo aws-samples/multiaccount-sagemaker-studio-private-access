@@ -1,0 +1,30 @@
+[
+  {
+    "ParameterKey": "VpcCidr",
+    "ParameterValue": "10.120.0.0/16"
+  },
+  {
+    "ParameterKey": "PrivateSubnetACidr",
+    "ParameterValue": "10.120.10.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnetBCidr",
+    "ParameterValue": "10.120.11.0/24"
+  },
+  {
+    "ParameterKey": "AttachSubnetACidr",
+    "ParameterValue": "10.120.20.0/24"
+  },
+  {
+    "ParameterKey": "AttachSubnetBCidr",
+    "ParameterValue": "10.120.21.0/24"
+  },
+  {
+    "ParameterKey": "SagemakerDomainName",
+    "ParameterValue": "sagemaker-domain-lob-b"
+  },
+  {
+    "ParameterKey": "UserId",
+    "ParameterValue": "user-lob-b"
+  }
+]
