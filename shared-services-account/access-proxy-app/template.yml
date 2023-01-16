@@ -1,0 +1,529 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Create VPCs and instances to test
+Parameters:
+  AccessVpcCidr:
+    Type: String
+    Description: CIDR for the access VPC
+    Default: 10.17.0.0/16
+  PrivateSubnetAAccessCidr:
+    Type: String
+    Description: CIDR for the shared services private subnet A
+    Default: 10.17.8.0/24
+  PrivateSubnetBAccessCidr:
+    Type: String
+    Description: CIDR for the shared services private subnet B
+    Default: 10.17.16.0/24
+  AttachSubnetAAccessCidr:
+    Type: String
+    Description: CIDR for the shared services attach subnet A
+    Default: 10.17.64.0/24
+  AttachSubnetBAccessCidr:
+    Type: String
+    Description: CIDR for the shared services attach subnet A
+    Default: 10.17.4.0/24
+  TGWId:
+    Description: Core Network TGWId
+    Type: String
+    Default: ''
+  APIGatewayVpcEndpoint:
+    Type: String
+    Description: The VPC Endpoint to consume API Gateway
+    Default: vpce-0b3aaab478bd72ad2
+  StageName:
+    Type: String
+    Default: dev
+    Description: The API-Gateway stage
+Conditions:
+  TgwShared:
+    Fn::Not:
+    - Fn::Equals:
+      - Ref: TGWId
+      - ''
+Resources:
+  VPCAccess:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock:
+        Ref: AccessVpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - Access
+            - Ref: AWS::StackName
+      - Key: project
+        Value: TGW-Demo
+  PrivateSubnetAAccess:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      CidrBlock:
+        Ref: PrivateSubnetAAccessCidr
+      AvailabilityZone:
+        Fn::Sub: ${AWS::Region}a
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - Access
+            - Ref: AWS::StackName
+            - Priv-A Subnet
+  PrivateSubnetBAccess:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      CidrBlock:
+        Ref: PrivateSubnetBAccessCidr
+      AvailabilityZone:
+        Fn::Sub: ${AWS::Region}b
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - Access
+            - Ref: AWS::StackName
+            - Priv-B Subnet
+  PrivateSubnetRouteTableAccess:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - Access
+            - Ref: AWS::StackName
+            - Private Route Table
+  PrivateASubnetRouteTableAssociationAccess:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableAccess
+      SubnetId:
+        Ref: PrivateSubnetAAccess
+  PrivateBSubnetRouteTableAssociationAccess:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableAccess
+      SubnetId:
+        Ref: PrivateSubnetBAccess
+  AttachSubnetAAccess:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      CidrBlock:
+        Ref: AttachSubnetAAccessCidr
+      AvailabilityZone:
+        Fn::Sub: ${AWS::Region}a
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - Access
+            - Ref: AWS::StackName
+            - Attach-A Subnet
+  AttachSubnetBAccess:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      CidrBlock:
+        Ref: AttachSubnetBAccessCidr
+      AvailabilityZone:
+        Fn::Sub: ${AWS::Region}b
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - Access
+            - Ref: AWS::StackName
+            - Attach-B Subnet
+  AttachSubnetRouteTableAccess:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - Access
+            - Ref: AWS::StackName
+            - Attach Route Table
+  AttachASubnetRouteTableAssociationAccess:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: AttachSubnetRouteTableAccess
+      SubnetId:
+        Ref: AttachSubnetAAccess
+  AttachBSubnetRouteTableAssociationAccess:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: AttachSubnetRouteTableAccess
+      SubnetId:
+        Ref: AttachSubnetBAccess
+  TGWAttachment:
+    Condition: TgwShared
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+      - Ref: AttachSubnetAAccess
+      - Ref: AttachSubnetBAccess
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: vpc-access-attachment
+      TransitGatewayId:
+        Ref: TGWId
+      VpcId:
+        Ref: VPCAccess
+  DefaultRoutePrivate:
+    Condition: TgwShared
+    DependsOn:
+    - TGWAttachment
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableAccess
+      DestinationCidrBlock: '0.0.0.0/0'
+      TransitGatewayId:
+        Ref: TGWId
+  LambdaSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      Tags:
+      - Key: Name
+        Value: VPCeAPIGateway
+      GroupDescription:
+        Fn::Sub: Allow inbound from api gateway
+  OutboundRuleSecurityGroupLambda:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow all outbound from security group
+      IpProtocol: '-1'
+      CidrIp: '0.0.0.0/0'
+      GroupId:
+        Ref: LambdaSG
+  API:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName:
+        Ref: StageName
+      EndpointConfiguration:
+        Type: PRIVATE
+        VPCEndpointIds:
+        - Ref: APIGatewayVpcEndpoint
+      TracingEnabled: true
+      Auth:
+        ResourcePolicy:
+          CustomStatements:
+          - Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: execute-api:Invoke
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:sourceVpce:
+                  Ref: APIGatewayVpcEndpoint
+        DefaultAuthorizer: LambdaRequestAuthorizer
+        Authorizers:
+          LambdaRequestAuthorizer:
+            FunctionPayloadType: REQUEST
+            FunctionArn:
+              Fn::GetAtt:
+              - AuthFunction
+              - Arn
+            FunctionInvokeRole:
+              Fn::GetAtt:
+              - AuthLambdaRole
+              - Arn
+            Identity:
+              Headers:
+              - Authorization
+              ReauthorizeEvery: 120
+
+  AuthLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: authpolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource:
+              Fn::GetAtt:
+              - AuthFunction
+              - Arn
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: AuthFunction
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          COGNITO_APP_CLIENT_ID:
+            Ref: CognitoUserPoolClient
+          COGNITO_KEYS_URL:
+            !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}/.well-known/jwks.json'
+    Metadata:
+      SamResourceId: AuthFunction
+  PresignedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: PresignedFunction
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          LOB_URLS_TABLE_NAME:
+            Ref: LobsMapTable
+          USER_LOB_TABLE_NAME:
+            Ref: UsersMapTable
+          AWS_STS_REGIONAL_ENDPOINTS:
+            regional
+          ACCESS_ROLE_NAME:
+            SagemakerStudioAccessRole
+      Role:
+        Fn::GetAtt:
+        - PresignedLambdaRole
+        - Arn
+      Architectures:
+      - x86_64
+      Events:
+        CreateUrl:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: API
+            Path: /{user_id+}
+            Method: get
+      VpcConfig:
+        SecurityGroupIds:
+        - Ref: LambdaSG
+        SubnetIds:
+        - Ref: PrivateSubnetAAccess
+        - Ref: PrivateSubnetBAccess
+    Metadata:
+      SamResourceId: PresignedFunction
+  PresignedLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+      - PolicyName: authpolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: sagemaker:CreatePresignedDomainUrl
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:sagemaker:${AWS::Region}:${AWS::AccountId}:user-profile/*/*
+            Condition:
+              IpAddress:
+                aws:VpcSourceIp:
+                  Ref: AccessVpcCidr
+      - PolicyName: dynamodbpolicy
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action: dynamodb:GetItem
+            Resource: 
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LobsMapTable}"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersMapTable}"
+      - PolicyName: assumerole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - sts:AssumeRole
+            Resource: "arn:aws:iam::*:role/SagemakerStudioAccessRole"
+
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: SageMakerPool
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain:
+        Fn::Sub: dns-name-${CognitoUserPoolClient}
+      UserPoolId:
+        Ref: CognitoUserPool
+    DependsOn:
+    - CognitoUserPoolClient
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId:
+        Ref: CognitoUserPool
+      AllowedOAuthFlows:
+      - implicit
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+      - email
+      - openid
+      CallbackURLs:
+      - http://localhost
+      GenerateSecret: false
+      ExplicitAuthFlows:
+      - ALLOW_USER_PASSWORD_AUTH
+      - ALLOW_USER_SRP_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+      - COGNITO
+    DependsOn:
+    - CognitoUserPool
+
+  LobsMapTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: lobs-map-table
+      AttributeDefinitions:
+      - AttributeName: PK
+        AttributeType: S
+      KeySchema:
+      - AttributeName: PK
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  UsersMapTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: users-map-table
+      AttributeDefinitions:
+      - AttributeName: PK
+        AttributeType: S
+      KeySchema:
+      - AttributeName: PK
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  VPCEndpointDynamoDB:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Ref: VPCAccess
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      RouteTableIds:
+        - !Ref PrivateSubnetRouteTableAccess
+      VpcEndpointType: Gateway
+
+Outputs:
+  VPCAccess:
+    Description: Access VPC
+    Value:
+      Ref: VPCAccess
+    Export:
+      Name:
+        Fn::Sub: Access-${AWS::StackName}-VPC
+  AttachSubnetAAccess:
+    Description: Access Attach Subnet A
+    Value:
+      Ref: AttachSubnetAAccess
+    Export:
+      Name:
+        Fn::Sub: Access-${AWS::StackName}-AttachSubnetA
+  AttachSubnetBAccess:
+    Description: Access Attach Subnet B
+    Value:
+      Ref: AttachSubnetBAccess
+    Export:
+      Name:
+        Fn::Sub: Access-${AWS::StackName}-AttachSubnetB
+  PrivateSubnetRouteTableAccess:
+    Description: Access Private Route Table
+    Value:
+      Ref: PrivateSubnetRouteTableAccess
+    Export:
+      Name:
+        Fn::Sub: Access-${AWS::StackName}-PrivateRouteTable
+  PrivateSubnetAAccess:
+    Description: Access Private Subnet A
+    Value:
+      Ref: PrivateSubnetAAccess
+    Export:
+      Name:
+        Fn::Sub: Access-${AWS::StackName}-PrivateSubnetA
+  PrivateSubnetBAccess:
+    Description: Access Private Subnet B
+    Value:
+      Ref: PrivateSubnetBAccess
+    Export:
+      Name:
+        Fn::Sub: Access-${AWS::StackName}-PrivateSubnetB
+  LambdaPresignedFunctionArn:
+    Description: ARN of the role of the presigned function
+    Value: !GetAtt PresignedLambdaRole.Arn
+    Export:
+      Name:
+        Fn::Sub: Access-${AWS::StackName}-LambdaArn
+  CognitoUserPoolId:
+    Description: Id of the cognito user pool
+    Value: !Ref CognitoUserPool
+  CognitoAppClientId:
+    Description: Id of the cognito web client
+    Value: !Ref CognitoUserPoolClient
+  UsersMapDynamoDbTable:
+    Description: Name of the Users Mapping DynamoDb Table
+    Value: !Ref UsersMapTable
+  LobsMapDynamoDbTable:
+    Description: Name of the Lobs Mapping DynamoDb Table
+    Value: !Ref LobsMapTable
+  ApiBasePath:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${API}.execute-api.${AWS::Region}.amazonaws.com/dev"

@@ -1,0 +1,607 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Create Networking Shared Service infrastructure"
+
+Parameters:
+  CentralVpcCidr:
+    Type: String
+    Description: CIDR for the shared services central VPC
+    Default: "10.0.0.0/16"
+  PrivateSubnetACentralCidr:
+    Type: String
+    Description: CIDR for the shared services private subnet A
+    Default: "10.0.8.0/21"
+  PrivateSubnetBCentralCidr:
+    Type: String
+    Description: CIDR for the shared services private subnet B
+    Default: "10.0.16.0/21"
+  AttachSubnetACentralCidr:
+    Type: String
+    Description: CIDR for the shared services attach subnet A
+    Default: "10.0.24.0/24"
+  AttachSubnetBCentralCidr:
+    Type: String
+    Description: CIDR for the shared services attach subnet A
+    Default: "10.0.25.0/24"
+  AccountsList:
+    Type: CommaDelimitedList
+    Description: Comma delimited list of accounts to share TGW with
+    Default: ""
+
+##### Parameters for resolvers
+  InboundResolverAIp:
+    Type: String
+    Default: "10.0.15.133"
+  InboundResolverBIp:
+    Type: String
+    Default: "10.0.20.133"
+  OutboundResolverAIp:
+    Type: String
+    Default: "10.0.15.134"
+  OutboundResolverBIp:
+    Type: String
+    Default: "10.0.20.134"
+
+Resources:
+
+
+####### Shared services networking ############################
+
+  # This VPC holds shared Services for all
+  VPCCentral:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref CentralVpcCidr
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [Central, Ref: "AWS::StackName"]]
+        - Key: project
+          Value: Central-Endpoints
+
+  PrivateSubnetACentral:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      CidrBlock: !Ref PrivateSubnetACentralCidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'a']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [Central, Ref: "AWS::StackName", Priv-A Subnet]]
+
+  PrivateSubnetBCentral:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      CidrBlock: !Ref PrivateSubnetBCentralCidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'b']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [Central, Ref: "AWS::StackName", Priv-B Subnet]]
+
+  PrivateSubnetRouteTableCentral:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [Central, Ref: "AWS::StackName", Private Route Table]]
+
+  PrivateASubnetRouteTableAssociationCentral:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableCentral
+      SubnetId:
+        Ref: PrivateSubnetACentral
+
+  PrivateBSubnetRouteTableAssociationCentral:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTableCentral
+      SubnetId:
+        Ref: PrivateSubnetBCentral
+
+  AttachSubnetACentral:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      CidrBlock: !Ref AttachSubnetACentralCidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'a']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [Central, Ref: "AWS::StackName", Attach-A Subnet]]
+
+  AttachSubnetBCentral:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      CidrBlock: !Ref AttachSubnetBCentralCidr
+      AvailabilityZone:
+        Fn::Join: ['', [!Ref AWS::Region, 'b']]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [Central, Ref: "AWS::StackName", Attach-B Subnet]]
+
+  AttachSubnetRouteTableCentral:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [Central, Ref: "AWS::StackName", Attach Route Table]]
+
+  AttachASubnetRouteTableAssociationCentral:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: AttachSubnetRouteTableCentral
+      SubnetId:
+        Ref: AttachSubnetACentral
+
+  AttachBSubnetRouteTableAssociationCentral:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: AttachSubnetRouteTableCentral
+      SubnetId:
+        Ref: AttachSubnetBCentral
+
+##############################################################
+####### Transit Gateway Resources ############################
+##############################################################
+
+# Create Transit Gateway
+  TransitGateway:
+    Type: "AWS::EC2::TransitGateway"
+    Properties:
+      AmazonSideAsn: 65000
+      Description: "TGW Route Integration Test"
+      AutoAcceptSharedAttachments: "enable"
+      DefaultRouteTableAssociation: "enable"
+      DnsSupport: "enable"
+      VpnEcmpSupport: "enable"
+
+ # Central Connect to the Transit Gateway
+  AttachCentral:
+    Type: "AWS::EC2::TransitGatewayAttachment"
+    Properties:
+      SubnetIds:
+        - Ref: AttachSubnetACentral
+        - Ref: AttachSubnetBCentral
+      Tags:
+        - Key: Name
+          Value: TGWCentralAttach
+      TransitGatewayId: !Ref TransitGateway
+      VpcId: !Ref VPCCentral
+  
+  DefaultRoutePrivate:
+    DependsOn: AttachCentral
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateSubnetRouteTableCentral
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId: !Ref TransitGateway
+
+################################################################
+######### DNS AND ENDPOINTS ################################
+################################################################
+
+####################### ROUTE 53 RESOLVER ######################
+
+####################### SG For DNS RESOLVER ###############
+  Route53OutboundResolverSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow DNS queries from anywhere
+      VpcId: !Ref VPCCentral
+      Tags:
+        - Key: Name
+          Value: !Sub sg-dns-out-${AWS::StackName}
+
+  Route53InboundResolverSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow DNS queries from anywhere
+      VpcId: !Ref VPCCentral
+      SecurityGroupIngress:
+      - IpProtocol: udp
+        FromPort: 53
+        ToPort: 53
+        CidrIp: 10.0.0.0/8
+        Description: Allow udp from all the internal range
+      - IpProtocol: tcp
+        FromPort: 53
+        ToPort: 53
+        CidrIp: 10.0.0.0/8
+        Description: Allow tcp from all the internal range
+      Tags:
+        - Key: Name
+          Value: !Sub sg-dns-out-${AWS::StackName}
+
+###################### SG For DNS RESOLVER ###############
+
+  Route53InboundResolver:
+    Type : AWS::Route53Resolver::ResolverEndpoint
+    Properties :
+      Direction : Inbound
+      IpAddresses :
+        - Ip: !Ref InboundResolverAIp
+          SubnetId: !Ref PrivateSubnetACentral
+        - Ip: !Ref InboundResolverBIp
+          SubnetId: !Ref PrivateSubnetBCentral
+      Name : !Sub dns-resolver-in-${AWS::StackName}
+      SecurityGroupIds :
+        - !Ref Route53InboundResolverSG
+      Tags :
+        - Key: Name
+          Value: !Sub dns-resolver-in-${AWS::StackName}
+
+  Route53OutboundResolver:
+    Type : AWS::Route53Resolver::ResolverEndpoint
+    Properties :
+      Direction : Outbound
+      IpAddresses :
+        - Ip: !Ref OutboundResolverAIp
+          SubnetId: !Ref PrivateSubnetACentral
+        - Ip: !Ref OutboundResolverBIp
+          SubnetId: !Ref PrivateSubnetBCentral
+      Name : !Sub dns-resolver-out-${AWS::StackName}
+      SecurityGroupIds :
+        - !Ref Route53OutboundResolverSG
+      Tags :
+        - Key: Name
+          Value: !Sub dns-resolver-out-${AWS::StackName}
+
+
+################################################################
+#########  VPC ENDPOINTS  #################################
+################################################################
+
+  EndpointSecGroupCentral:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open-up ports for local VPC
+      GroupName: !Join ["-", [Central, Ref: "AWS::StackName", "vpc-sec-group"]]
+      VpcId:
+        Ref: VPCCentral
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: "1"
+          ToPort: "65535"
+          CidrIp: 10.0.0.0/8
+          Description: Allow tcp from all the internal range
+        - IpProtocol: tcp
+          FromPort: "1"
+          ToPort: "65535"
+          CidrIp: 192.168.10.0/24
+          Description: Allow tcp from on premise
+        - IpProtocol: udp
+          FromPort: "1"
+          ToPort: "65535"
+          CidrIp: 10.0.0.0/8
+          Description: Allow udp from all the internal range
+  
+############# SAGEMAKER ENDPOINTS ###########################
+
+  VPCEndpointSagemakerAPI:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sagemaker.api'
+      # PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - Ref: PrivateSubnetACentral
+        - Ref: PrivateSubnetBCentral
+      SecurityGroupIds:
+        - Ref: EndpointSecGroupCentral
+  
+  VPCEndpointSagemakerStudio:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      ServiceName: !Sub "aws.sagemaker.${AWS::Region}.studio"
+      # PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - Ref: PrivateSubnetACentral
+        - Ref: PrivateSubnetBCentral
+      SecurityGroupIds:
+        - Ref: EndpointSecGroupCentral
+
+############# ACCESS ENDPOINTS ###########################
+
+  VPCEndpointAPIGateway:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.execute-api"
+      # PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - Ref: PrivateSubnetACentral
+        - Ref: PrivateSubnetBCentral
+      SecurityGroupIds:
+        - Ref: EndpointSecGroupCentral
+
+  VPCEndpointSts:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Ref: VPCCentral
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sts"
+      # PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - Ref: PrivateSubnetACentral
+        - Ref: PrivateSubnetBCentral
+      SecurityGroupIds:
+        - Ref: EndpointSecGroupCentral
+
+################################################################
+#########  DNS RESOLVER RULES  #################################
+################################################################
+
+  DNSRuleFwdtoAPI:
+    Type: AWS::Route53Resolver::ResolverRule
+    Properties:
+      DomainName: !Sub api.sagemaker.${AWS::Region}.amazonaws.com
+      Name: !Sub fwd-api-${AWS::StackName}
+      ResolverEndpointId: !Ref Route53OutboundResolver
+      RuleType: FORWARD
+      TargetIps:
+        - Ip: !Ref InboundResolverAIp 
+          Port: 53
+        - Ip: !Ref InboundResolverBIp
+          Port: 53
+
+  DNSRuleFwdtoStudio:
+    Type: AWS::Route53Resolver::ResolverRule
+    Properties:
+      DomainName: !Sub studio.${AWS::Region}.sagemaker.aws
+      Name: !Sub fwd-studio-${AWS::StackName}
+      ResolverEndpointId: !Ref Route53OutboundResolver
+      RuleType: FORWARD
+      TargetIps:
+        - Ip: !Ref InboundResolverAIp 
+          Port: 53
+        - Ip: !Ref InboundResolverBIp
+          Port: 53
+
+  DNSRuleFwdtoAPIGW:
+    Type: AWS::Route53Resolver::ResolverRule
+    Properties:
+      DomainName: !Sub execute-api.${AWS::Region}.amazonaws.com
+      Name: !Sub fwd-apigw-${AWS::StackName}
+      ResolverEndpointId: !Ref Route53OutboundResolver
+      RuleType: FORWARD
+      TargetIps:
+        - Ip: !Ref InboundResolverAIp 
+          Port: 53
+        - Ip: !Ref InboundResolverBIp
+          Port: 53
+
+  DNSRuleFwdtoSTS:
+    Type: AWS::Route53Resolver::ResolverRule
+    Properties:
+      DomainName: !Sub sts.${AWS::Region}.amazonaws.com
+      Name: !Sub fwd-sts-${AWS::StackName}
+      ResolverEndpointId: !Ref Route53OutboundResolver
+      RuleType: FORWARD
+      TargetIps:
+        - Ip: !Ref InboundResolverAIp 
+          Port: 53
+        - Ip: !Ref InboundResolverBIp
+          Port: 53
+
+################################################################
+######### Private Hosted Zones  ################################
+################################################################
+
+  ApiHostedZone: 
+    Type: "AWS::Route53::HostedZone"
+    Properties: 
+      HostedZoneConfig: 
+        Comment: 'My hosted zone for Api'
+      Name: !Sub api.sagemaker.${AWS::Region}.amazonaws.com
+      VPCs: 
+        - 
+          VPCId: !Ref VPCCentral
+          VPCRegion: !Sub ${AWS::Region}
+
+      HostedZoneTags: 
+        - 
+          Key: Name
+          Value: Api-PHZ
+  
+  ApiRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn: VPCEndpointSagemakerAPI
+    Properties:
+      HostedZoneId: !Ref ApiHostedZone
+      Name: !Sub "api.sagemaker.${AWS::Region}.amazonaws.com"
+      Type: A
+      AliasTarget:
+        DNSName: !Select [1, !Split [":", !Select [0, !GetAtt VPCEndpointSagemakerAPI.DnsEntries]]]
+        HostedZoneId: !Select [0, !Split [":", !Select [0, !GetAtt VPCEndpointSagemakerAPI.DnsEntries]]]
+
+  StudioHostedZone: 
+    Type: "AWS::Route53::HostedZone"
+    Properties: 
+      HostedZoneConfig: 
+        Comment: 'My hosted zone for Studio'
+      Name: !Sub studio.${AWS::Region}.sagemaker.aws
+      VPCs: 
+        - 
+          VPCId: !Ref VPCCentral
+          VPCRegion: !Sub ${AWS::Region}
+
+      HostedZoneTags: 
+        - 
+          Key: Name
+          Value: Studio-PHZ
+
+  StudioRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn: VPCEndpointSagemakerStudio
+    Properties:
+      HostedZoneId: !Ref StudioHostedZone
+      Name: !Sub "*.studio.${AWS::Region}.sagemaker.aws"
+      Type: A
+      AliasTarget:
+        DNSName: !Select [1, !Split [":", !Select [3, !GetAtt VPCEndpointSagemakerStudio.DnsEntries]]]
+        HostedZoneId: !Select [0, !Split [":", !Select [3, !GetAtt VPCEndpointSagemakerStudio.DnsEntries]]]
+ 
+  ApiGwHostedZone: 
+    Type: "AWS::Route53::HostedZone"
+    Properties: 
+      HostedZoneConfig: 
+        Comment: 'My hosted zone for ApiGw'
+      Name: !Sub execute-api.${AWS::Region}.amazonaws.com
+      VPCs: 
+        - 
+          VPCId: !Ref VPCCentral
+          VPCRegion: !Sub ${AWS::Region}
+
+      HostedZoneTags: 
+        - 
+          Key: Name
+          Value: ApiGw-PHZ
+
+  ApiGwRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn: VPCEndpointAPIGateway
+    Properties:
+      HostedZoneId: !Ref ApiGwHostedZone
+      Name: !Sub "*.execute-api.${AWS::Region}.amazonaws.com"
+      Type: A
+      AliasTarget:
+        DNSName: !Select [1, !Split [":", !Select [0, !GetAtt VPCEndpointAPIGateway.DnsEntries]]]
+        HostedZoneId: !Select [0, !Split [":", !Select [0, !GetAtt VPCEndpointAPIGateway.DnsEntries]]]
+
+  StsGwHostedZone: 
+    Type: "AWS::Route53::HostedZone"
+    Properties: 
+      HostedZoneConfig: 
+        Comment: 'My hosted zone for Sts'
+      Name: !Sub sts.${AWS::Region}.amazonaws.com
+      VPCs: 
+        - 
+          VPCId: !Ref VPCCentral
+          VPCRegion: !Sub ${AWS::Region}
+
+      HostedZoneTags: 
+        - 
+          Key: Name
+          Value: ApiGw-PHZ
+
+  StsRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn: VPCEndpointSts
+    Properties:
+      HostedZoneId: !Ref StsGwHostedZone
+      Name: !Sub "sts.${AWS::Region}.amazonaws.com"
+      Type: A
+      AliasTarget:
+        DNSName: !Select [1, !Split [":", !Select [0, !GetAtt VPCEndpointSts.DnsEntries]]]
+        HostedZoneId: !Select [0, !Split [":", !Select [0, !GetAtt VPCEndpointSts.DnsEntries]]]
+
+################################################################
+######### Transit Gateway Share  ################################
+################################################################
+
+  ShareTransitGateway:
+    Type: AWS::RAM::ResourceShare
+    Properties:
+      Name: "TGW Share Sagemaker Accounts"
+      ResourceArns:
+        - !Sub
+          - arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:transit-gateway/${TransitGatewayId}
+          - {TransitGatewayId: !Ref TransitGateway}
+      Principals: !Ref AccountsList
+
+Outputs:
+
+  # Datacenter Services 1 Outputs
+  VPCCentral:
+    Description: "Datacenter Services VPC"
+    Value: !Ref VPCCentral
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-VPC"
+      
+  AttachSubnetACentral:
+    Description: "Central Attach Subnet A"
+    Value: !Ref AttachSubnetACentral
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-AttachSubnetA"
+  AttachSubnetBCentral:
+    Description: "Central Attach Subnet B"
+    Value: !Ref AttachSubnetBCentral
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-AttachSubnetB"
+  PrivateSubnetACentral:
+    Description: "Central Private Subnet A"
+    Value: !Ref PrivateSubnetACentral
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-PrivateSubnetA"
+  PrivateSubnetBCentral:
+    Description: "Central Private Subnet B"
+    Value: !Ref PrivateSubnetBCentral
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-PrivateSubnetB"
+  PrivateSubnetRouteTableCentral:
+    Description: "Central Private Route Table"
+    Value: !Ref PrivateSubnetRouteTableCentral
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-PrivateRouteTable"
+  VPCEndpointAPIGateway:
+    Description: VPC Endpoint for api gateway
+    Value: !Ref VPCEndpointAPIGateway
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-VPCEndpointAPIGateway"
+  VPCEndpointSagemakerStudio:
+    Description: VPC Endpoint for sagemaker studio
+    Value: !Ref VPCEndpointSagemakerStudio
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-VPCEndpointSagemakerStudio"
+  VPCEndpointSagemakerApi:
+    Description: VPC Endpoint for sagemaker api
+    Value: !Ref VPCEndpointSagemakerAPI
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-VPCEndpointSagemakerApi"
+  TransitGatewayId:
+    Description: Id of the transit Gateway
+    Value: !Ref TransitGateway 
+    Export:
+      Name: !Sub "Central-${AWS::StackName}-TGW"
+  SagemakerApiHostedZoneId:
+    Description: Id of the sagemaker api PHZ
+    Value: !Ref ApiHostedZone
+  SagemakerStudioHostedZoneId:
+    Description: Id of the Sagemaker Studio PHZ
+    Value: !Ref StudioHostedZone
+  ApiGatewayHostedZoneId:
+    Description: Id of the Api Gw PHZ
+    Value: !Ref ApiGwHostedZone
+  StsHostedZoneId:
+    Description: Id of the STS PHZ
+    Value: !Ref StsGwHostedZone
