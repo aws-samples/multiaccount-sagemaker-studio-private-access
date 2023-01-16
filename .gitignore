@@ -247,5 +247,4 @@ $RECYCLE.BIN/
 
 # End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode
 access-account/access.yml
-sagemaker-account/blog-launch-parameters/parameters-sagemaker-account-*
 access-account/dynamo-schemas/*
