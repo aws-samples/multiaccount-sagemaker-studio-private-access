@@ -22,6 +22,10 @@ Parameters:
     Type: String
     Description: CIDR for the shared services attach subnet A
     Default: "10.0.25.0/24"
+  AccountsList:
+    Type: CommaDelimitedList
+    Description: Comma delimited list of accounts to share TGW with
+    Default: ""
 
 ##### Parameters for resolvers
   InboundResolverAIp:
@@ -521,6 +525,20 @@ Resources:
         DNSName: !Select [1, !Split [":", !Select [0, !GetAtt VPCEndpointSts.DnsEntries]]]
         HostedZoneId: !Select [0, !Split [":", !Select [0, !GetAtt VPCEndpointSts.DnsEntries]]]
 
+################################################################
+######### Transit Gateway Share  ################################
+################################################################
+
+  ShareTransitGateway:
+    Type: AWS::RAM::ResourceShare
+    Properties:
+      Name: "TGW Share Sagemaker Accounts"
+      ResourceArns:
+        - !Sub
+          - arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:transit-gateway/${TransitGatewayId}
+          - {TransitGatewayId: !Ref TransitGateway}
+      Principals: !Ref AccountsList
+
 Outputs:
 
   # Datacenter Services 1 Outputs
@@ -575,3 +593,15 @@ Outputs:
     Value: !Ref TransitGateway 
     Export:
       Name: !Sub "Central-${AWS::StackName}-TGW"
+  SagemakerApiHostedZoneId:
+    Description: Id of the sagemaker api PHZ
+    Value: !Ref ApiHostedZone
+  SagemakerStudioHostedZoneId:
+    Description: Id of the Sagemaker Studio PHZ
+    Value: !Ref StudioHostedZone
+  ApiGatewayHostedZoneId:
+    Description: Id of the Api Gw PHZ
+    Value: !Ref ApiGwHostedZone
+  StsHostedZoneId:
+    Description: Id of the STS PHZ
+    Value: !Ref StsGwHostedZone

@@ -302,7 +302,7 @@ Resources:
           COGNITO_APP_CLIENT_ID:
             Ref: CognitoUserPoolClient
           COGNITO_KEYS_URL:
-            !Sub 'https://cognito-idp.{AWS::Region}.amazonaws.com/{CognitoUserPool}/.well-known/jwks.json'
+            !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}/.well-known/jwks.json'
     Metadata:
       SamResourceId: AuthFunction
   PresignedFunction:
@@ -314,9 +314,9 @@ Resources:
       Environment:
         Variables:
           LOB_URLS_TABLE_NAME:
-            Ref: LobUrlsTable
+            Ref: LobsMapTable
           USER_LOB_TABLE_NAME:
-            Ref: UserMapLobTable
+            Ref: UsersMapTable
           AWS_STS_REGIONAL_ENDPOINTS:
             regional
           ACCESS_ROLE_NAME:
@@ -378,8 +378,8 @@ Resources:
           - Effect: Allow
             Action: dynamodb:GetItem
             Resource: 
-              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LobUrlsTable}"
-              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UserMapLobTable}"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LobsMapTable}"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersMapTable}"
       - PolicyName: assumerole
         PolicyDocument:
           Version: '2012-10-17'
@@ -425,10 +425,10 @@ Resources:
     DependsOn:
     - CognitoUserPool
 
-  LobUrlsTable:
+  LobsMapTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: sagemaker-lob-accounts-table
+      TableName: lobs-map-table
       AttributeDefinitions:
       - AttributeName: PK
         AttributeType: S
@@ -439,10 +439,10 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  UserMapLobTable:
+  UsersMapTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: sagemaker-users-map-table
+      TableName: users-map-table
       AttributeDefinitions:
       - AttributeName: PK
         AttributeType: S
@@ -516,5 +516,14 @@ Outputs:
     Description: Id of the cognito user pool
     Value: !Ref CognitoUserPool
   CognitoAppClientId:
-   Description: Id of the cognito web client
-   Value: !Ref CognitoUserPoolClient
+    Description: Id of the cognito web client
+    Value: !Ref CognitoUserPoolClient
+  UsersMapDynamoDbTable:
+    Description: Name of the Users Mapping DynamoDb Table
+    Value: !Ref UsersMapTable
+  LobsMapDynamoDbTable:
+    Description: Name of the Lobs Mapping DynamoDb Table
+    Value: !Ref LobsMapTable
+  ApiBasePath:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${API}.execute-api.${AWS::Region}.amazonaws.com/dev"
