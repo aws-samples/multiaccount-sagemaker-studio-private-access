@@ -268,7 +268,6 @@ Run:
 
 ```
 source setup/get-on-premise-outputs.sh
-
 ```
 
 Then run the following commands to set up the PHZs
@@ -291,9 +290,9 @@ Once deploy and set up we have to use the bastion host to RDP into the instance 
 
 The following command can be used to retrieve the command that must be launched:
 
-'''
+```
 aws cloudformation describe-stacks --query 'Stacks[?StackName==`on-premise`][].Outputs[?OutputKey==`TunnelCommand`].OutputValue' --output text
-'''
+```
 
 In a terminal and with the previously created ec2 key pair run the command
 
@@ -303,7 +302,7 @@ And then use an rdp client like Windows Remote Desktop to connect to the instanc
 - Username: Administrator
 - Password: Can be retrieved with the KeyPair from the Windows instance
 
-More information about connecting to your windows instance in AWS' [Connect To Your Windows Instance](https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/connecting_to_windows_instance.html) official documentation
+More information about connecting to your windows instance in AWS documentation [Connect To Your Windows Instance](https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/connecting_to_windows_instance.html) official documentation
 
 Once in the instance (if it is not installed) we will install firefox -> [Link to install firefox in the instance](https://gmusumeci.medium.com/unattended-install-of-firefox-browser-using-powershell-6841a7742f9a)
 
@@ -326,7 +325,7 @@ This presigned url must be consumed through the central Studio VPC Endpoint and 
 
 If we try to consume it through our browser a message saying: "Auth token containing insufficient permissions" will be shown.
 
-### Testing End to End
+### Testing End to End
 
 To test the end to end we will need to get tokens for the users, so that we can consume the access API.
 
@@ -364,8 +363,8 @@ Therefore we will add the tokens to the request header.
 2. Right click on the failed API with File as user-lob-a call and click Edit and Resend
 3. Scroll down on the headers side and add a new header
 
-Header Key: Authorization
-Header Value: Bearer <access-token-of-user-to-make-request>
+- Header Key: Authorization
+- Header Value: Bearer <access-token-of-user-to-make-request>
 
 And click send
 
