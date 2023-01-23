@@ -155,7 +155,6 @@ Now we will fill the users data in both the DyanmoDB Tables and the Cognito User
 Run the following script:
 ```
 ./scripts/setup/fill-data.sh
-
 ```
 
 This scripts populates the following elements:
@@ -165,7 +164,7 @@ This scripts populates the following elements:
 |     PK      |     LOB     |
 |   :----:    |    :----:   |
 | user-lob-a  | lob-a       |
-| Paragraph   | Text        |
+| user-lob-b  | lob-b       |
 
 - Dynamo DB LOBs Table
 
@@ -213,22 +212,21 @@ If we try to consume it through our browser a message saying: "Auth token contai
 
 ![OnPremiseArchitecture](images/OnPremiseArchitecture.png)
 
-For simplicity we will deploy the on premise simulator in the Central Account
+For simplicity we will deploy the on premise simulator in the Central Account. Follow this steps:
 
-First, create a key-pair in the central account. You can use the instructions in [Create key pairs](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html)
+- First, create a key-pair in the central account. You can use the instructions in [Create key pairs](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html)
 
-Fill the following values in the general-parameters.json file (scripts/setup/parameters/general-parameters.json)
-- YOUR_KEY_PAIR_NAME -> name of the key pair you created before
-- YOUR_IP_TO_CONNECT_TO_BASTION -> the ip of your local machine ending in /32 
+- Fill the following values in the general-parameters.json file (scripts/setup/parameters/general-parameters.json)
+    - YOUR_KEY_PAIR_NAME -> name of the key pair you created before
+    - YOUR_IP_TO_CONNECT_TO_BASTION -> the ip of your local machine ending in /32 
 
-The run the following script to set up the on-premise stack:
+- The run the following script to set up the on-premise stack:
 
 ```
 ./scripts/setup/deploy-on-premise.sh
-
 ```
 
-The following script:
+This script:
 - Creates the on-premise CloudFormation Stack
 - Associates the Sagemaker Studio and Api Gateway PHZ with the on-premise VPC
 
@@ -236,52 +234,64 @@ The following script:
 
 To simulate the connectivity of the on-premise environment and the cloud we will use VPC Peering between the On-premise VPC and the Central Networking VPC. [Intructions to create VPC Peering](https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html)
 
-**Don´t forget to accept the peering connection**
+- **Don´t forget to accept the peering connection**
 
-Remember to update the route tables of on-prem and central networking private subnet route tables to point the respective CIDRs to the peering connection.
+- Remember to update the route tables of on-prem and central networking private subnet route tables to point the respective CIDRs to the peering connection.
 
-Once both VPCs have been peered we can use the solution for DNS proposed in [Part 1](https://aws.amazon.com/blogs/machine-learning/secure-amazon-sagemaker-studio-presigned-urls-part-1-foundational-infrastructure/) of this series. However, in this case we have taken advantage of the previously created PHZs and associate the Sageamker Studio and API Gateway PHZs with our On-premise VPC, as we did for the Access VPC.
+- Once both VPCs have been peered we can use the solution for DNS proposed in [Part 1](https://aws.amazon.com/blogs/machine-learning/secure-amazon-sagemaker-studio-presigned-urls-part-1-foundational-infrastructure/) of this series. However, in this case we have taken advantage of the previously created PHZs and associate the Sageamker Studio and API Gateway PHZs with our On-premise VPC, as we did for the Access VPC.
 
 ## Testing the solution
 
 Once deploy and set up we have to use the bastion host to RDP into the instance in the private subnet
 
-The following command can be used to retrieve the command that must be launched:
+- Use following command to retrieve the command that must be launched:
 
 ```
 ON_PREMISE_STACK_NAME=$(jq -r '.[] | select(.ParameterKey == "pOnPremiseStackName") | .ParameterValue' scripts/setup/parameters/general-parameters.json)
 REGION=$(jq -r '.[] | select(.ParameterKey == "region") | .ParameterValue' ${GENERAL_PARAMS_FILE})
 SHARED_SERVICES_PROFILE=$(jq -r '.[] | select(.ParameterKey == "pSharedServicesProfile") | .ParameterValue' ${GENERAL_PARAMS_FILE})
-
-aws --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} cloudformation describe-stacks --query "Stacks[?StackName=='${ON_PREMISE_STACK_NAME}'][].Outputs[?OutputKey=='TunnelCommand'].OutputValue" --output text
-
 ```
 
-In a terminal and with the previously created ec2 key pair run the command
+```
+aws cloudformation describe-stacks \
+    --profile ${SHARED_SERVICES_PROFILE} \
+    --region ${REGION} \
+    --query "Stacks[?StackName=='${ON_PREMISE_STACK_NAME}'][].Outputs[?OutputKey=='TunnelCommand'].OutputValue" --output text
+```
 
-This will create an RDP connection between our localhost and the private windows instance.
+The follow this steps to connect:
 
-And then use an rdp client like Windows Remote Desktop to connect to the instance.
-- Username: Administrator
-- Password: Can be retrieved with the KeyPair from the Windows instance
+- In a terminal and in the location where the previously created ec2 key pair is stored, run the command.
+    - This will create an RDP connection between our localhost and the private windows instance.
+
+- And then use an rdp client like Windows Remote Desktop to connect to the instance.
+    - Username: Administrator
+    - Password: Can be retrieved with the KeyPair from the running Windows instance in the [EC2 Console](https://console.aws.amazon.com/ec2/home?#Instances:instanceState=running)
+
+____
 
 More information about connecting to your windows instance in AWS documentation [Connect To Your Windows Instance](https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/connecting_to_windows_instance.html) official documentation
 
-Once in the instance (if it is not installed) we will install firefox -> [Link to install firefox in the instance](https://gmusumeci.medium.com/unattended-install-of-firefox-browser-using-powershell-6841a7742f9a)
+Once in the instance (in case it has not been installed) we will install firefox -> [Link to install firefox in the instance](https://gmusumeci.medium.com/unattended-install-of-firefox-browser-using-powershell-6841a7742f9a)
 
 ### Testing End to End
+
+#### Setting up test
 
 To test the end to end we will need to get tokens for the users, so that we can consume the access API.
 
 To get the access tokens run the following commands substuting the cognito client id which can be retrieved from the access stack:
 
+- First set up the required env variables
+
 ```
 REGION=$(jq -r '.[] | select(.ParameterKey == "region") | .ParameterValue' ${GENERAL_PARAMS_FILE})
 SHARED_SERVICES_PROFILE=$(jq -r '.[] | select(.ParameterKey == "pSharedServicesProfile") | .ParameterValue' ${GENERAL_PARAMS_FILE})
 ACCESS_STACK_NAME=$(jq -r '.[] | select(.ParameterKey == "pAccessAppStackName") | .ParameterValue' scripts/setup/parameters/general-parameters.json)
-
 COGNITO_APP_CLIENT_ID=$(aws --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} cloudformation describe-stacks --query "Stacks[?StackName=='${ACCESS_STACK_NAME}'][].Outputs[?OutputKey=='CognitoAppClientId'].OutputValue" --output text)
 ```
+
+- These commands can be used to retrieve the access token for user-lob-a and user-lob-b respectively
 
 ```
 aws cognito-idp initiate-auth \
@@ -300,44 +310,49 @@ aws cognito-idp initiate-auth \
     --auth-parameters USERNAME=user-lob-b,PASSWORD=UserLobB1!
 ```
 
-Now to test we need the API´s URL which we retrieved from the access-stack outputs and we can get it by running this command:
+- To test the solution inside the Windows Client we need the API´s URL. It can be retrieved from the outputs of the Access Solution Cloudformaiton Stack by running this command:
 
 ```
 echo $(aws --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} cloudformation describe-stacks --query "Stacks[?StackName=='${ACCESS_STACK_NAME}'][].Outputs[?OutputKey=='ApiBasePath'].OutputValue" --output text)
 
 ```
 
-To call for user a the api call will look as follows:
+To call for user-lob-a the api call will look as follows:
 
 https://{API_ID}.execute-api.{REGION}.amazonaws.com/dev/user-lob-a
 
+#### Testing
+
 Once we have all this information, we can try to call the API Gateway api from within our windows app, however we should get the following error: {message: Unauthorize}
 
-Therefore we will add the tokens to the request header.
+To overcome this we will add the tokens to the request header.
 
-1. Got to Firefox inspection tools and network tab
-2. Right click on the failed API with File as user-lob-a call and click Edit and Resend
+1. Got to [Firefox Developer tools](https://firefox-source-docs.mozilla.org/devtools-user/) and network tab
+2. Right click on the failed API call with File as user-lob-a call and click Edit and Resend
 3. Scroll down on the headers side and add a new header
 
 - Header Key: Authorization
 - Header Value: Bearer <access-token-of-user-to-make-request>
 
-And click send
+4. Click send
 
 ![End2EndTesting](images/TestingE2E.png)
 
-In the return response you will get the Location and if you click on it it will open up your Jupyter Lab
+5. In the return response you will get the Location and if you click on it it will open up your Jupyter Lab
 
-Click it fast as you only get 20 seconds to consume it
+6. Click it fast as you only get 20 seconds to consume it
 
-First time it will take some time, as Sagemaker is creating the application for the user, but next attemps will be faster.
+7. First time accessing it will take some time, as Sagemaker is creating the application for the user, but next attemps will be faster.
+
+#### Important notes
 
 In a real world scenario this action will be perform by an access application which will authomatically understand the 302 redirect and send the user to the Sagemaker App
 
 If we try to edit the request to send all the same information but for the user-lob-b URL we will get the following error in the response:
 
-x-amzn-ErrorType: AccessDeniedException
+<center>x-amzn-ErrorType: AccessDeniedException</center>
 
+____
 This same process could be repeated changing eveything of user-lob-a to user-lob-b and the access would be granted for the LOB B domain
 
 ## Clean up
