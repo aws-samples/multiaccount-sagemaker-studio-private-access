@@ -21,7 +21,7 @@ It shows how to create an accessing solution for Sagemaekr Studio Domains in a m
 The following parameters can be configured in the general paramters file (scripts/setup/parameters/general-parameters.json):
 
 |       Parameter Name         |            Default Vale            |                      Description                                |
-|           :----:             |              :----:                |                         :----:                                  |
+|           :----:             |              :----:                |                         :----                                  |
 |    pSharedServicesProfile    |    infra-shared-services-profile   | Profile used to deploy resources in the Shared Services Account |
 |    pSagemakerLobAProfile     |    infra-lob-a-profile             | Profile used to deploy resources in the Sagemaker Lob A Account |
 |    pSagemakerLobBProfile     |    infra-lob-b-profile             | Profile used to deploy resources in the Sagemaker Lob B Account |
