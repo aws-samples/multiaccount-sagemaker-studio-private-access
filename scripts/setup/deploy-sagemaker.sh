@@ -1,18 +1,15 @@
 #!/bin/bash
 
 DIRNAME=$(pwd)
-PARAMS_FILE="sagemaker-account/blog-launch-parameters/parameters-sagemaker-account-lob-b.json"
-
+echo "Deploying stack..."
 #Setting the refresh time for SAM deploy
-SAM_CLI_POLL_DELAY=5
 function usage {
     echo "Usage: ./deploy.sh"
-    echo "-b artefact_bucket              (mandatory)" 
-    echo "[-r aws_region]                 (default is eu-west-1)"
-    echo "[-p aws_cli_profile]            (default is default profile)"
-    echo "[-s stack_name]                 (default is CF-my-stack)"
-    echo "[-c create_bucket y/n]          (default is n)"
-    echo "[-t template_file y/n]          (default is ./Infra/main.yml)"
+    echo "-f params-file                  (mandatory)" 
+    echo "-s stack-name                   (mandatory)"
+    echo "-p profile                      (mandatory)"
+    echo "-t template-file                (mandatory)"
+    echo "-r region                       (mandatory)"
 }
 
 while getopts f:s:p:t:r: flag
@@ -28,6 +25,7 @@ do
     esac
 done
 
+GENERAL_PARAMS_FILE="${DIRNAME}/scripts/setup/parameters/general-parameters.json"
 # Creates a CloudFormation stack only if is not already been deployed
 # Arguments:
 #   - $1: Stack name
@@ -78,8 +76,14 @@ function create_stack_if_not_exist {
   fi
 }
 
-# Getting the template parameters
+# Shared services profile to get outputs from stacks
+SHARED_SERVICES_PROFILE=$(jq -r '.[] | select(.ParameterKey == "pSharedServicesProfile") | .ParameterValue' ${GENERAL_PARAMS_FILE})
 
+# Templates file names
+NETWORK_INFRA_STACK_NAME=$(jq -r '.[] | select(.ParameterKey == "pNetworkingStackName") | .ParameterValue' ${GENERAL_PARAMS_FILE})
+ACCESS_INFRA_STACK_NAME=$(jq -r '.[] | select(.ParameterKey == "pAccessAppStackName") | .ParameterValue' ${GENERAL_PARAMS_FILE})
+
+# Getting the template parameters
 VPC_CIDR=$(jq -r '.[] | select(.ParameterKey == "VpcCidr") | .ParameterValue' ${DIRNAME}/${PARAMS_FILE})
 PRIVATE_SUBNET_A_CIDR=$(jq -r '.[] | select(.ParameterKey == "PrivateSubnetACidr") | .ParameterValue' ${DIRNAME}/${PARAMS_FILE})
 PRIVATE_SUBNET_B_CIDR=$(jq -r '.[] | select(.ParameterKey == "PrivateSubnetBCidr") | .ParameterValue' ${DIRNAME}/${PARAMS_FILE})
@@ -88,6 +92,12 @@ ATTACH_SUBNET_B_CIDR=$(jq -r '.[] | select(.ParameterKey == "AttachSubnetBCidr")
 SAGEMAKER_DOMAIN_NAME=$(jq -r '.[] | select(.ParameterKey == "SagemakerDomainName") | .ParameterValue' ${DIRNAME}/${PARAMS_FILE})
 USER_ID=$(jq -r '.[] | select(.ParameterKey == "UserId") | .ParameterValue' ${DIRNAME}/${PARAMS_FILE})
 
+# Getting the shared services stacks parameters
+VPC_ENDPOINT_SAGEMAKER_STUDIO=$(aws cloudformation describe-stacks --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} --query "Stacks[?StackName=='${NETWORK_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='VPCEndpointSagemakerStudio'].OutputValue" --output text)
+VPC_ENDPOINT_SAGEMAKER_API=$(aws cloudformation describe-stacks --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} --query "Stacks[?StackName=='${NETWORK_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='VPCEndpointSagemakerApi'].OutputValue" --output text)
+TRANSIT_GATEWAY_ID=$(aws cloudformation describe-stacks --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} --query "Stacks[?StackName=='${NETWORK_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='TransitGatewayId'].OutputValue" --output text)
+LAMBDA_PRESIGNED_FUNCTION_ARN=$(aws cloudformation describe-stacks --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} --query "Stacks[?StackName=='${ACCESS_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='LambdaPresignedFunctionArn'].OutputValue" --output text)
+
 TEMPLATE_PARAMETERS="ParameterKey=VpcCidr,ParameterValue=${VPC_CIDR} \
         ParameterKey=PrivateSubnetACidr,ParameterValue=${PRIVATE_SUBNET_A_CIDR} \
         ParameterKey=PrivateSubnetBCidr,ParameterValue=${PRIVATE_SUBNET_B_CIDR} \
@@ -95,9 +105,9 @@ TEMPLATE_PARAMETERS="ParameterKey=VpcCidr,ParameterValue=${VPC_CIDR} \
         ParameterKey=AttachSubnetBCidr,ParameterValue=${ATTACH_SUBNET_B_CIDR} \
         ParameterKey=SagemakerDomainName,ParameterValue=${SAGEMAKER_DOMAIN_NAME} \
         ParameterKey=UserId,ParameterValue=${USER_ID} \
-        ParameterKey=SagemakerStudioVpce,ParameterValue=${VPCEndpointSagemakerStudio} \
-        ParameterKey=SagemakerApiVpce,ParameterValue=${VPCEndpointSagemakerApi} \
-        ParameterKey=LambdaPresignedUrlRoleArn,ParameterValue=${LambdaPresignedFunctionArn} \
-        ParameterKey=TGWId,ParameterValue=${TransitGatewayId}"
+        ParameterKey=SagemakerStudioVpce,ParameterValue=${VPC_ENDPOINT_SAGEMAKER_STUDIO} \
+        ParameterKey=SagemakerApiVpce,ParameterValue=${VPC_ENDPOINT_SAGEMAKER_API} \
+        ParameterKey=LambdaPresignedUrlRoleArn,ParameterValue=${LAMBDA_PRESIGNED_FUNCTION_ARN} \
+        ParameterKey=TGWId,ParameterValue=${TRANSIT_GATEWAY_ID}"
 
 create_stack_if_not_exist ${STACK_NAME} ${TEMPLATE_FILE} ${PROFILE} ${REGION} "${TEMPLATE_PARAMETERS}"

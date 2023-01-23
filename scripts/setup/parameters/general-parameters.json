@@ -1,0 +1,46 @@
+[
+    {
+      "ParameterKey": "pSharedServicesProfile",
+      "ParameterValue": "infra-shared-services-profile"
+    },
+    {
+      "ParameterKey": "pSagemakerLobAProfile",
+      "ParameterValue": "infra-lob-a-profile"
+    },
+    {
+      "ParameterKey": "pSagemakerLobBProfile",
+      "ParameterValue": "infra-lob-b-profile"
+    },
+    {
+      "ParameterKey": "region",
+      "ParameterValue": "us-east-1"
+    },
+    {
+      "ParameterKey": "pNetworkingStackName",
+      "ParameterValue": "networking"
+    },
+    {
+      "ParameterKey": "pAccessAppStackName",
+      "ParameterValue": "access"
+    },
+    {
+      "ParameterKey": "pSagemakerLobAStackName",
+      "ParameterValue": "sagemaker-lob-a"
+    },
+    {
+      "ParameterKey": "pSagemakerLobBStackName",
+      "ParameterValue": "sagemaker-lob-b"
+    },
+    {
+      "ParameterKey": "pOnPremiseStackName",
+      "ParameterValue": "on-premise"
+    },
+    {
+      "ParameterKey": "pKeyPairName",
+      "ParameterValue": "sagemaker-demo-kp"
+    },
+    {
+      "ParameterKey": "pLocalIpAddress",
+      "ParameterValue": "0.0.0.0/0"
+    }
+  ]
