@@ -108,7 +108,7 @@ then
     --stack-name $ACCESS_INFRA_STACK_NAME \
     --resolve-s3 \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-overrides ${ACCESS_PARAMS}
+    --parameter-overrides ${ACCESS_PARAMS} \
     --template-file shared-services-account/access-proxy-app/template.yml
 
   ########### Associating PHZ ############
