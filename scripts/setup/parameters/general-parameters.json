@@ -13,7 +13,7 @@
     },
     {
       "ParameterKey": "region",
-      "ParameterValue": "us-east-1"
+      "ParameterValue": "eu-north-1"
     },
     {
       "ParameterKey": "pNetworkingStackName",

@@ -74,6 +74,7 @@ function deploy_stack {
       --tags ${5} \
       --capabilities "CAPABILITY_NAMED_IAM" "CAPABILITY_AUTO_EXPAND" \
       --profile ${3} \
+      --region ${4} \
       ${PARAMETERS}
 }
 
@@ -98,10 +99,12 @@ then
   "
   sam build \
     --profile $SHARED_SERVICES_PROFILE \
+    --region $REGION \
     --template-file shared-services-account/access-proxy-app/template.yml
 
   sam deploy \
     --profile $SHARED_SERVICES_PROFILE \
+    --region $REGION \
     --stack-name $ACCESS_INFRA_STACK_NAME \
     --resolve-s3 \
     --capabilities CAPABILITY_NAMED_IAM \

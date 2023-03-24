@@ -18,7 +18,19 @@ It shows how to create an accessing solution for Sagemaekr Studio Domains in a m
 
 ## Deployment steps
 
-The following parameters can be configured in the general paramters file (scripts/setup/parameters/general-parameters.json):
+1. First, clone this repository by running:
+
+```
+git clone git@github.com:aws-samples/multiaccount-sagemaker-studio-private-access.git
+```
+
+2. Once the repository is cloned move into the root of it and open it in your favorite code editor:
+
+```
+cd multiaccount-sagemaker-studio-private-access
+```
+
+3. The following parameters can be configured in the general parameters file (scripts/setup/parameters/general-parameters.json):
 
 |       Parameter Name         |            Default Vale            |                      Description                                |
 |           :----:             |              :----:                |                         :----                                  |
@@ -35,6 +47,9 @@ The following parameters can be configured in the general paramters file (script
 |    pLocalIpAddress           |    1.1.1.1/32                      | Ip address to access the on-premise resources                   |
 
 ### Set the variables for the file location
+
+Run the following commands in your command line:
+
 ```
 DIRNAME=$(pwd)
 GENERAL_PARAMS_FILE="${DIRNAME}/scripts/setup/parameters/general-parameters.json"
@@ -54,7 +69,7 @@ This will deploy 2 cloudformation stacks in your shared services account:
 
 #### Networking stack
 
-Deploys the following resources that are reused by other templates:
+Deploys the following resources that are later reused by other templates:
 - AWS Transit gateway (TGW)
 - AWS VPC Endpoints
     - API Gateway VPC Endpoint
@@ -68,12 +83,15 @@ Deploys the following resources that are reused by other templates:
     - STS PHZ
 - A Transit Gateway Resource Share with Sagemaker Accounts
 
-**Note**
-Transit gateway is automatically shared with the Sagemaker accounts
+**Notes:** 
 
-If the account are in the same OU and auto accept resource shares is enabled there is no need to accept the resource. Otherwise, acceptance in the receiver accounts will be needed.
+- Transit gateway is automatically shared with the Sagemaker accounts
 
-More informacion about this approach in [Automating AWS Transit Gateway attachments to a transit gateway in a central account](https://aws.amazon.com/blogs/networking-and-content-delivery/automating-aws-transit-gateway-attachments-to-a-transit-gateway-in-a-central-account/)
+- If the account are in the same Organizational Unit and auto accept resource shares is enabled there is no need to accept the resource. Otherwise, acceptance in the receiver accounts will be needed.
+
+More informacion about this approach in:
+- [Automating AWS Transit Gateway attachments to a transit gateway in a central account](https://aws.amazon.com/blogs/networking-and-content-delivery/automating-aws-transit-gateway-attachments-to-a-transit-gateway-in-a-central-account/)
+- [AWS Organizations terminology and concepts](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html)
 
 #### Access Application Stack
 
