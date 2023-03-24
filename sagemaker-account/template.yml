@@ -306,7 +306,7 @@ Resources:
                   - sagemaker:CreatePresignedDomainUrl
                   - sagemaker:DescribeUserProfile
                   - sagemaker:ListDomains
-                Resource: "*"
+                Resource: "*" # Needs to be able to list this resources in the account without knowing the name
                 Condition:
                   StringEquals:
                     'aws:sourceVpce': 

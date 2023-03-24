@@ -112,7 +112,7 @@ then
   VPC_ACCESS_ID=$(aws --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} cloudformation describe-stacks --query "Stacks[?StackName=='${ACCESS_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='VPCAccess'].OutputValue" --output text)
   STS_HOSTED_ZONE_ID=$(aws --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} cloudformation describe-stacks --query "Stacks[?StackName=='${NETWORK_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='StsHostedZoneId'].OutputValue" --output text)
   SAGEMAKER_API_HOSTED_ZONE_ID=$(aws --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} cloudformation describe-stacks --query "Stacks[?StackName=='${NETWORK_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='SagemakerApiHostedZoneId'].OutputValue" --output text)
-
+  
   aws route53 associate-vpc-with-hosted-zone \
       --profile $SHARED_SERVICES_PROFILE \
       --hosted-zone-id $STS_HOSTED_ZONE_ID \

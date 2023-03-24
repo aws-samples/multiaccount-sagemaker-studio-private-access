@@ -46,7 +46,6 @@ From root of the repository. To deploy the shared service account resources run 
 
 ```
 ./scripts/setup/deploy_infra.sh -c all
-
 ```
 
 This will deploy 2 cloudformation stacks in your shared services account:
@@ -112,6 +111,7 @@ SAGEMAKER_LOB_A_PROFILE=$(jq -r '.[] | select(.ParameterKey == "pSagemakerLobAPr
 SAGEMAKER_LOB_A_PARAMS_FILE=sagemaker-account/blog-launch-parameters/parameters-sagemaker-account-lob-a.json
 SAGEMAKER_LOB_A_TEMPLATE_FILE=file://sagemaker-account/template.yml
 ```
+
 ```
 scripts/setup/deploy-sagemaker.sh \
     -f $SAGEMAKER_LOB_A_PARAMS_FILE \
@@ -119,7 +119,6 @@ scripts/setup/deploy-sagemaker.sh \
     -p $SAGEMAKER_LOB_A_PROFILE \
     -t $SAGEMAKER_LOB_A_TEMPLATE_FILE\
     -r $REGION
-
 ```
 
 ### Account LOB B
@@ -133,6 +132,7 @@ SAGEMAKER_LOB_B_PROFILE=$(jq -r '.[] | select(.ParameterKey == "pSagemakerLobBPr
 SAGEMAKER_LOB_B_PARAMS_FILE=sagemaker-account/blog-launch-parameters/parameters-sagemaker-account-lob-b.json
 SAGEMAKER_LOB_B_TEMPLATE_FILE=file://sagemaker-account/template.yml
 ```
+
 ```
 scripts/setup/deploy-sagemaker.sh \
     -f $SAGEMAKER_LOB_B_PARAMS_FILE \
@@ -140,7 +140,6 @@ scripts/setup/deploy-sagemaker.sh \
     -p $SAGEMAKER_LOB_B_PROFILE \
     -t $SAGEMAKER_LOB_B_TEMPLATE_FILE\
     -r $REGION
-
 ```
 
 This cloudformation templates create:
