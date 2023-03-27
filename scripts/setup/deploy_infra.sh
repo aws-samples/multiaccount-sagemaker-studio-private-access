@@ -108,8 +108,7 @@ then
     --stack-name $ACCESS_INFRA_STACK_NAME \
     --resolve-s3 \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-overrides ${ACCESS_PARAMS} \
-    --template-file shared-services-account/access-proxy-app/template.yml
+    --parameter-overrides ${ACCESS_PARAMS}
 
   ########### Associating PHZ ############
   VPC_ACCESS_ID=$(aws --profile ${SHARED_SERVICES_PROFILE} --region ${REGION} cloudformation describe-stacks --query "Stacks[?StackName=='${ACCESS_INFRA_STACK_NAME}'][].Outputs[?OutputKey=='VPCAccess'].OutputValue" --output text)

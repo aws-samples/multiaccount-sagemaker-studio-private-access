@@ -87,7 +87,7 @@ Deploys the following resources that are later reused by other templates:
 
 - Transit gateway is automatically shared with the Sagemaker accounts
 
-- If the account are in the same Organizational Unit and auto accept resource shares is enabled there is no need to accept the resource. Otherwise, acceptance in the receiver accounts will be needed.
+- If the account are in the same Organizational Unit and auto-accept resource shares is enabled there is no need to accept the resource. Otherwise, acceptance in the receiver accounts will be needed.
 
 More informacion about this approach in:
 - [Automating AWS Transit Gateway attachments to a transit gateway in a central account](https://aws.amazon.com/blogs/networking-and-content-delivery/automating-aws-transit-gateway-attachments-to-a-transit-gateway-in-a-central-account/)
@@ -130,6 +130,8 @@ SAGEMAKER_LOB_A_PARAMS_FILE=sagemaker-account/blog-launch-parameters/parameters-
 SAGEMAKER_LOB_A_TEMPLATE_FILE=file://sagemaker-account/template.yml
 ```
 
+And run the following script to deploy in the Sagemaker Lob A Account:
+
 ```
 scripts/setup/deploy-sagemaker.sh \
     -f $SAGEMAKER_LOB_A_PARAMS_FILE \
@@ -151,12 +153,14 @@ SAGEMAKER_LOB_B_PARAMS_FILE=sagemaker-account/blog-launch-parameters/parameters-
 SAGEMAKER_LOB_B_TEMPLATE_FILE=file://sagemaker-account/template.yml
 ```
 
+And run the following script to deploy in the Sagemaker Lob B Account:
+
 ```
 scripts/setup/deploy-sagemaker.sh \
     -f $SAGEMAKER_LOB_B_PARAMS_FILE \
     -s $SAGEMAKER_LOB_B_STACK_NAME \
     -p $SAGEMAKER_LOB_B_PROFILE \
-    -t $SAGEMAKER_LOB_B_TEMPLATE_FILE\
+    -t $SAGEMAKER_LOB_B_TEMPLATE_FILE \
     -r $REGION
 ```
 
@@ -212,10 +216,9 @@ If we just want to test the presigned url this can easily be done following this
 - Under APIs, find and click on the access API
 - Under resources go to the access api {user_id+} get method
 - Then click on test
-- Enter one of `lob-user-a` or `lob-user-b` as the user_id path
+- Enter one of `user-lob-a` or `user-lob-b` as the user_id path
 - Click on the test button
-- Copy the presigned url returned in the response
-- Consume it in our simulated on-premise windows app
+- You will get a presigned url, however it won´t work if pasted in your local computer´s browser. For url consumption and end to end testing follow the steps in the [Extra section](#extra)
 
 ![ApiGatewayTesting](images/TestingApiGatewayConsole.png)
 
@@ -237,7 +240,7 @@ For simplicity we will deploy the on premise simulator in the Central Account. F
     - YOUR_KEY_PAIR_NAME -> name of the key pair you created before
     - YOUR_IP_TO_CONNECT_TO_BASTION -> the ip of your local machine ending in /32 
 
-- The run the following script to set up the on-premise stack:
+- Then run the following script to set up the on-premise stack:
 
 ```
 ./scripts/setup/deploy-on-premise.sh
@@ -249,7 +252,7 @@ This script:
 
 ### On-premise connectivity
 
-To simulate the connectivity of the on-premise environment and the cloud we will use VPC Peering between the On-premise VPC and the Central Networking VPC. [Intructions to create VPC Peering](https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html)
+To simulate the connectivity of the on-premise environment and the cloud we will use VPC Peering between the On-premise VPC and the Central Networking VPC. Follow the [Intructions to create VPC Peering](https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html)
 
 - **Don´t forget to accept the peering connection**
 
