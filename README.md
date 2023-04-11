@@ -1,6 +1,6 @@
 # MultiAccount Sagemaker Studio Private Access
 
-This repository demonstrates the solution presented in the following blog [Secure Amazon SageMaker Studio presigned URLs Part 3: Multi-account private API access to Studio](https://aws.amazon.com/blogs/machine-learning/secure-amazon-sagemaker-studio-presigned-urls-part-3-multi-account-private-api-access-to-studio/).
+This repository demonstrates the solution presented in the following blog: [Secure Amazon SageMaker Studio presigned URLs Part 3: Multi-account private API access to Studio](https://aws.amazon.com/blogs/machine-learning/secure-amazon-sagemaker-studio-presigned-urls-part-3-multi-account-private-api-access-to-studio/).
 
 It shows how to create an accessing solution for Sagemaker Studio Domains in a multi account environment and in a private and secure way by using presigned domain urls.
 
