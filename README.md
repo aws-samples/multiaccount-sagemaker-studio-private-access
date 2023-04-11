@@ -1,8 +1,8 @@
 # MultiAccount Sagemaker Studio Private Access
 
-This repository demonstrates the solution presented in the following [blog](link to be provided after blog publication).
+This repository demonstrates the solution presented in the following blog [Secure Amazon SageMaker Studio presigned URLs Part 3: Multi-account private API access to Studio](https://aws.amazon.com/blogs/machine-learning/secure-amazon-sagemaker-studio-presigned-urls-part-3-multi-account-private-api-access-to-studio/).
 
-It shows how to create an accessing solution for Sagemaekr Studio Domains in a multi account environment in a private and secure way by using presigned domain urls.
+It shows how to create an accessing solution for Sagemaker Studio Domains in a multi account environment and in a private and secure way by using presigned domain urls.
 
 ![BlogArchitecture](images/BlogArchitecture.png)
 
@@ -370,7 +370,7 @@ In a real world scenario this action will be perform by an access application wh
 
 If we try to edit the request to send all the same information but for the user-lob-b URL we will get the following error in the response:
 
-<center>x-amzn-ErrorType: AccessDeniedException</center>
+<p style="text-align: center;">x-amzn-ErrorType: AccessDeniedException</p>
 
 ____
 This same process could be repeated changing eveything of user-lob-a to user-lob-b and the access would be granted for the LOB B domain
@@ -393,12 +393,12 @@ scripts/cleanup/remove-associated-vpcs.sh
 scripts/cleanup/delete-infra.sh
 ```
 
-The script search for the CloudFormation stacks in their respective accounts and deletes them, the orders is the following:
-- On-Premise Stack
-- Sagemaker LOB A Stack
-- Sagemaker LOB B Stack
-- Access App Stack
-- Networking Stack
+The script searches for the CloudFormation stacks in their respective accounts and deletes them. The delete order is as follows:
+1. On-Premise Stack
+2. Sagemaker LOB A Stack
+3. Sagemaker LOB B Stack
+4. Access App Stack
+5. Networking Stack
 
 ## Security
 
